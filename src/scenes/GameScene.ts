@@ -525,11 +525,7 @@ export class GameScene extends Phaser.Scene {
     this.renderTexture.erase(eraseGfx, 0, 0);
     eraseGfx.destroy();
 
-    // Flash / shockwave effect
-    const flash = this.add.graphics().setDepth(10);
-    flash.fillStyle(0xffaa00, 0.8);
-    flash.fillCircle(cx, cy, config.blastRadius * 1.2);
-    this.time.delayedCall(120, () => flash.destroy());
+    this.doPoofEffect(cx, cy, config.blastRadius);
 
     // Apply damage to worms
     for (const team of this.teams) {
@@ -549,6 +545,96 @@ export class GameScene extends Phaser.Scene {
           }
         }
       }
+    }
+  }
+
+  private doPoofEffect(cx: number, cy: number, radius: number): void {
+    // 1. Central flash: orange disc that expands and fades
+    const flash = this.add.graphics().setDepth(12);
+    const flashState = { r: radius * 0.6, alpha: 1.0 };
+    this.tweens.add({
+      targets: flashState,
+      r: radius * 2.2,
+      alpha: 0,
+      duration: 280,
+      ease: 'Power2',
+      onUpdate: () => {
+        flash.clear();
+        flash.fillStyle(0xffdd00, flashState.alpha * 0.9);
+        flash.fillCircle(cx, cy, flashState.r);
+        flash.fillStyle(0xff6600, flashState.alpha);
+        flash.fillCircle(cx, cy, flashState.r * 0.6);
+      },
+      onComplete: () => flash.destroy(),
+    });
+
+    // 2. Expanding shockwave ring
+    const ring = this.add.graphics().setDepth(12);
+    const ringState = { r: radius * 0.5, alpha: 0.8 };
+    this.tweens.add({
+      targets: ringState,
+      r: radius * 2.5,
+      alpha: 0,
+      duration: 350,
+      ease: 'Sine.easeOut',
+      onUpdate: () => {
+        ring.clear();
+        ring.lineStyle(3, 0xffffff, ringState.alpha);
+        ring.strokeCircle(cx, cy, ringState.r);
+      },
+      onComplete: () => ring.destroy(),
+    });
+
+    // 3. Debris: small chunks shot outward with gravity arc
+    const DEBRIS = 14;
+    for (let i = 0; i < DEBRIS; i++) {
+      const angle = (i / DEBRIS) * Math.PI * 2 + (Math.random() - 0.5) * 0.5;
+      const speed = radius * (1.2 + Math.random() * 1.0);
+      const vx = Math.cos(angle) * speed;
+      const vy = Math.sin(angle) * speed - radius * 0.8;
+      const r = 2 + Math.random() * 3;
+      const color = [0xff4400, 0xff8800, 0xffcc00, 0x884400][Math.floor(Math.random() * 4)];
+      const gfx = this.add.graphics().setDepth(11);
+      const state = { t: 0 };
+      this.tweens.add({
+        targets: state,
+        t: 1,
+        duration: 450 + Math.random() * 250,
+        ease: 'Linear',
+        onUpdate: () => {
+          const dt2 = state.t;
+          const px = cx + vx * dt2;
+          const py = cy + vy * dt2 + 300 * dt2 * dt2; // gravity arc
+          gfx.clear();
+          gfx.fillStyle(color, 1 - dt2 * 0.8);
+          gfx.fillCircle(px, py, r * (1 - dt2 * 0.5));
+        },
+        onComplete: () => gfx.destroy(),
+      });
+    }
+
+    // 4. Smoke puffs: grey circles that drift upward and expand
+    const PUFFS = 5;
+    for (let i = 0; i < PUFFS; i++) {
+      const ox = (Math.random() - 0.5) * radius;
+      const startR = radius * 0.3;
+      const smoke = this.add.graphics().setDepth(13);
+      const state = { t: 0 };
+      this.tweens.add({
+        targets: state,
+        t: 1,
+        duration: 600 + Math.random() * 400,
+        delay: i * 60,
+        ease: 'Sine.easeOut',
+        onUpdate: () => {
+          const py = cy - state.t * radius * 1.8;
+          const pr = startR + state.t * radius * 0.9;
+          smoke.clear();
+          smoke.fillStyle(0x888888, (1 - state.t) * 0.55);
+          smoke.fillCircle(cx + ox, py, pr);
+        },
+        onComplete: () => smoke.destroy(),
+      });
     }
   }
 
