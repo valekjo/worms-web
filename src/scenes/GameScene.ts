@@ -350,10 +350,16 @@ export class GameScene extends Phaser.Scene {
       this.aimElevation = Math.min(Math.PI / 2, this.aimElevation + AIM_SPEED * dt);
     }
 
-    // SPACE: hold to charge, release to fire
+    // SPACE: rifle fires instantly at full power; other weapons hold to charge
     if (Phaser.Input.Keyboard.JustDown(this.keys.space)) {
-      this.isCharging = true;
-      this.chargeStartTime = this.time.now;
+      if (this.selectedWeapon === 'RIFLE') {
+        const worm = this.turnManager.activeWorm;
+        const angle = worm.facingLeft ? Math.PI - this.aimElevation : this.aimElevation;
+        this.fireWeapon(worm, angle, 1);
+      } else {
+        this.isCharging = true;
+        this.chargeStartTime = this.time.now;
+      }
     } else if (this.isCharging && Phaser.Input.Keyboard.JustUp(this.keys.space)) {
       const elapsed = (this.time.now - this.chargeStartTime) / 1000;
       this.aimPower = Math.min(1, elapsed / 2);
@@ -485,8 +491,8 @@ export class GameScene extends Phaser.Scene {
         const dy = worm.y - cy;
         const dist = Math.sqrt(dx * dx + dy * dy);
         if (dist < config.blastRadius) {
-          const dmg = config.damage * (1 - dist / config.blastRadius);
-          worm.takeDamage(Math.round(dmg));
+          const dmg = Math.max(5, Math.round(config.damage * (1 - dist / config.blastRadius)));
+          worm.takeDamage(dmg);
           // Knock back
           const force = (1 - dist / config.blastRadius) * 200;
           if (dist > 0) {
