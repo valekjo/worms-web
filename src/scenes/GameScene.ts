@@ -35,6 +35,10 @@ export class GameScene extends Phaser.Scene {
   private renderTexture!: Phaser.GameObjects.RenderTexture;
   private wormVisuals: WormVisual[] = [];
 
+  // Clouds
+  private cloudGraphic!: Phaser.GameObjects.Graphics;
+  private clouds: Array<{ x: number; y: number; scale: number; speed: number; puffs: Array<{ dx: number; dy: number; r: number }> }> = [];
+
   // Projectiles
   private activeProjectiles: Projectile[] = [];
   private projectileGraphics: Map<Projectile, Phaser.GameObjects.Graphics> = new Map();
@@ -109,6 +113,15 @@ export class GameScene extends Phaser.Scene {
   }
 
   create(): void {
+    // Sky background (behind everything)
+    const skyBg = this.add.graphics().setDepth(-2);
+    skyBg.fillStyle(CONFIG.TERRAIN.SKY_COLOR, 1);
+    skyBg.fillRect(0, 0, CONFIG.WIDTH, CONFIG.HEIGHT);
+
+    // Cloud layer
+    this.cloudGraphic = this.add.graphics().setDepth(-1);
+    this.initClouds();
+
     // Build terrain render texture
     this.renderTexture = this.add.renderTexture(0, 0, CONFIG.WIDTH, CONFIG.HEIGHT).setOrigin(0, 0).setDepth(0);
     this.drawTerrainToTexture();
@@ -198,13 +211,6 @@ export class GameScene extends Phaser.Scene {
 
     ctx.putImageData(imageData, 0, 0);
 
-    // Draw sky background first
-    const skyGfx = this.add.graphics();
-    skyGfx.fillStyle(CONFIG.TERRAIN.SKY_COLOR, 1);
-    skyGfx.fillRect(0, 0, width, height);
-    this.renderTexture.draw(skyGfx, 0, 0);
-    skyGfx.destroy();
-
     // Draw terrain via texture
     const texKey = '__terrain__';
     if (this.textures.exists(texKey)) {
@@ -259,6 +265,9 @@ export class GameScene extends Phaser.Scene {
       }
       this.drawAimLine(activeWorm);
     }
+
+    // Update clouds
+    this.updateClouds(dt);
 
     // Update projectiles
     this.updateProjectiles(dt);
@@ -533,6 +542,41 @@ export class GameScene extends Phaser.Scene {
         const { angle, power } = this.aiPendingFire;
         this.aiPendingFire = null;
         this.fireWeapon(worm, angle, power);
+      }
+    }
+  }
+
+  private initClouds(): void {
+    const rng = (n: number) => { const x = Math.sin(n * 127.1) * 43758.5; return x - Math.floor(x); };
+    for (let i = 0; i < 7; i++) {
+      const puffs = [];
+      const puffCount = 3 + Math.floor(rng(i * 3) * 3); // 3–5 puffs
+      for (let p = 0; p < puffCount; p++) {
+        puffs.push({
+          dx: (rng(i * 7 + p) - 0.3) * 80,
+          dy: (rng(i * 11 + p) - 0.5) * 30,
+          r:  28 + rng(i * 13 + p) * 28,
+        });
+      }
+      this.clouds.push({
+        x:     rng(i * 5) * CONFIG.WIDTH,
+        y:     60 + rng(i * 9) * 180,
+        scale: 0.7 + rng(i * 17) * 0.6,
+        speed: 8 + rng(i * 19) * 18,
+        puffs,
+      });
+    }
+  }
+
+  private updateClouds(dt: number): void {
+    this.cloudGraphic.clear();
+    for (const c of this.clouds) {
+      c.x += c.speed * dt;
+      if (c.x > CONFIG.WIDTH + 200) c.x = -200;
+
+      this.cloudGraphic.fillStyle(0xffffff, 0.82);
+      for (const p of c.puffs) {
+        this.cloudGraphic.fillCircle(c.x + p.dx * c.scale, c.y + p.dy * c.scale, p.r * c.scale);
       }
     }
   }
