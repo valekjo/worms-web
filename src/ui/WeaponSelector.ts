@@ -26,11 +26,11 @@ export class WeaponSelector {
 
     for (let i = 0; i < WEAPONS.length; i++) {
       const wx = startX + i * 160;
-      const rect = this.scene.add.rectangle(wx, y, 140, 44, 0x222222, 0.85).setDepth(10);
+      const rect = this.scene.add.rectangle(wx, y, 140, 44, 0x222222, 0.85).setDepth(10).setScrollFactor(0);
       const txt = this.scene.add
         .text(wx, y, LABELS[WEAPONS[i]], { fontSize: '16px', color: '#fff' })
         .setOrigin(0.5)
-        .setDepth(11);
+        .setDepth(11).setScrollFactor(0);
       this.containers.push(rect);
       this.texts.push(txt);
     }

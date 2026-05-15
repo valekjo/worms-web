@@ -1,6 +1,7 @@
 export const CONFIG = {
   WIDTH: 1280,
   HEIGHT: 720,
+  WORLD_WIDTH: 2560,
   GRAVITY: 600,           // px/s²
   MOVE_SPEED: 120,        // px/s
   TURN_TIME: 30,          // seconds

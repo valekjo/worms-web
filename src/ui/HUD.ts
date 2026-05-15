@@ -34,7 +34,7 @@ export class HUD {
     // Top-left: turn + team info
     this.turnText = this.scene.add
       .text(10, 10, '', { fontSize: '18px', color: '#fff', stroke: '#000', strokeThickness: 3 })
-      .setDepth(20);
+      .setDepth(20).setScrollFactor(0);
 
     // Top-right: timer
     this.timerText = this.scene.add
@@ -46,10 +46,10 @@ export class HUD {
         fontStyle: 'bold',
       })
       .setOrigin(1, 0)
-      .setDepth(20);
+      .setDepth(20).setScrollFactor(0);
 
     // Wind indicator (top center)
-    this.windArrow = this.scene.add.graphics().setDepth(20);
+    this.windArrow = this.scene.add.graphics().setDepth(20).setScrollFactor(0);
     this.windText = this.scene.add
       .text(width / 2, 10, '', {
         fontSize: '16px',
@@ -58,7 +58,7 @@ export class HUD {
         strokeThickness: 3,
       })
       .setOrigin(0.5, 0)
-      .setDepth(20);
+      .setDepth(20).setScrollFactor(0);
 
     // Bottom weapon text
     this.weaponText = this.scene.add
@@ -68,7 +68,7 @@ export class HUD {
         stroke: '#000',
         strokeThickness: 3,
       })
-      .setDepth(20);
+      .setDepth(20).setScrollFactor(0);
 
   }
 

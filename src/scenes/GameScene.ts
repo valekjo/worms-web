@@ -90,7 +90,7 @@ export class GameScene extends Phaser.Scene {
     this.aiPendingFire = null;
 
     // Build terrain
-    this.terrain = new Terrain(CONFIG.WIDTH, CONFIG.HEIGHT);
+    this.terrain = new Terrain(CONFIG.WORLD_WIDTH, CONFIG.HEIGHT);
     this.terrain.generate(Math.floor(Math.random() * 1000));
 
     // Create teams
@@ -100,12 +100,12 @@ export class GameScene extends Phaser.Scene {
       const team = new Team(ti, cfg.name, cfg.color, isAI);
       this.teams.push(team);
 
-      // Spread worms across the map
-      const sectionWidth = CONFIG.WIDTH / (CONFIG.TEAMS.length * wormsPerTeam);
+      // Spread worms across the world
+      const sectionWidth = CONFIG.WORLD_WIDTH / (CONFIG.TEAMS.length * wormsPerTeam);
       for (let wi = 0; wi < wormsPerTeam; wi++) {
         const globalIdx = ti * wormsPerTeam + wi;
         const baseX = sectionWidth * globalIdx + sectionWidth / 2;
-        const x = Math.max(20, Math.min(CONFIG.WIDTH - 20, baseX + (Math.random() - 0.5) * 60));
+        const x = Math.max(20, Math.min(CONFIG.WORLD_WIDTH - 20, baseX + (Math.random() - 0.5) * 60));
         const y = this.terrain.surfaceY(x) - 16;
         const worm = new Worm(globalIdx, ti, x, y);
         worm.name = `${cfg.name.split(' ')[1]} ${wi + 1}`;
@@ -117,8 +117,8 @@ export class GameScene extends Phaser.Scene {
   }
 
   create(): void {
-    // Sky gradient (horizon lighter, top deeper blue)
-    const skyBg = this.add.graphics().setDepth(-4);
+    // Sky gradient fixed to camera (screen-space)
+    const skyBg = this.add.graphics().setDepth(-4).setScrollFactor(0);
     const steps = 12;
     for (let i = 0; i < steps; i++) {
       const t = i / steps;
@@ -129,17 +129,20 @@ export class GameScene extends Phaser.Scene {
       skyBg.fillRect(0, Math.floor((i / steps) * CONFIG.HEIGHT), CONFIG.WIDTH, Math.ceil(CONFIG.HEIGHT / steps) + 1);
     }
 
-    // Three cloud layers: far (slow, small, grey) → near (fast, large, white)
+    // Three cloud layers: far → near, all screen-space (scrollFactor 0), parallax applied manually
     this.cloudLayers = [
-      { graphic: this.add.graphics().setDepth(-3), clouds: [], color: 0xbbccdd, alpha: 0.45 }, // far
-      { graphic: this.add.graphics().setDepth(-2), clouds: [], color: 0xddeeff, alpha: 0.65 }, // mid
-      { graphic: this.add.graphics().setDepth(-1), clouds: [], color: 0xffffff, alpha: 0.88 }, // near
+      { graphic: this.add.graphics().setDepth(-3).setScrollFactor(0), clouds: [], color: 0xbbccdd, alpha: 0.45 }, // far
+      { graphic: this.add.graphics().setDepth(-2).setScrollFactor(0), clouds: [], color: 0xddeeff, alpha: 0.65 }, // mid
+      { graphic: this.add.graphics().setDepth(-1).setScrollFactor(0), clouds: [], color: 0xffffff, alpha: 0.88 }, // near
     ];
     this.initClouds();
 
-    // Build terrain render texture
-    this.renderTexture = this.add.renderTexture(0, 0, CONFIG.WIDTH, CONFIG.HEIGHT).setOrigin(0, 0).setDepth(0);
+    // Build terrain render texture (full world width)
+    this.renderTexture = this.add.renderTexture(0, 0, CONFIG.WORLD_WIDTH, CONFIG.HEIGHT).setOrigin(0, 0).setDepth(0);
     this.drawTerrainToTexture();
+
+    // Camera: follow active worm across the world
+    this.cameras.main.setBounds(0, 0, CONFIG.WORLD_WIDTH, CONFIG.HEIGHT);
 
     // Create worm visuals
     for (const team of this.teams) {
@@ -251,6 +254,13 @@ export class GameScene extends Phaser.Scene {
       this.wind = (Math.random() * 2 - 1) * CONFIG.WIND_MAX;
       this.hud.updateWind(this.wind);
     }
+
+    // Camera: smoothly follow active worm
+    const camTarget = Phaser.Math.Clamp(
+      this.turnManager.activeWorm.x - CONFIG.WIDTH / 2,
+      0, CONFIG.WORLD_WIDTH - CONFIG.WIDTH,
+    );
+    this.cameras.main.scrollX += (camTarget - this.cameras.main.scrollX) * 0.06;
 
     // Physics: gravity + terrain collision for all worms
     for (const team of this.teams) {
@@ -594,20 +604,29 @@ export class GameScene extends Phaser.Scene {
   }
 
   private updateClouds(dt: number): void {
-    // Wind contributes to cloud drift; parallax factors per layer (far → near)
-    const windFactors = [0.15, 0.35, 0.65];
+    const camX = this.cameras.main.scrollX;
+    // Parallax: how much each layer shifts with camera (far barely moves, near moves most)
+    const parallaxFactors = [0.12, 0.30, 0.55];
+    const windFactors     = [0.15, 0.35, 0.65];
+    const windDir = Math.sign(this.wind) || 1;
+    const TILE = CONFIG.WIDTH + 500; // tiling period in screen space
+
     for (let li = 0; li < this.cloudLayers.length; li++) {
       const layer = this.cloudLayers[li];
-      const windDir = Math.sign(this.wind) || 1;
+      const pFactor   = parallaxFactors[li];
       const windDrift = this.wind * windFactors[li];
+
       layer.graphic.clear();
       layer.graphic.fillStyle(layer.color, layer.alpha);
+
       for (const c of layer.clouds) {
         c.x += (c.speed * windDir + windDrift) * dt;
-        if (c.x > CONFIG.WIDTH + 250) c.x = -250;
-        if (c.x < -250) c.x = CONFIG.WIDTH + 250;
+        // Parallax render position: shift left proportional to camera scroll
+        const raw = c.x - camX * pFactor;
+        // Normalise into [-250, WIDTH+250] with seamless tiling
+        const rx = ((raw % TILE) + TILE) % TILE - 250;
         for (const p of c.puffs) {
-          layer.graphic.fillCircle(c.x + p.dx * c.scale, c.y + p.dy * c.scale, p.r * c.scale);
+          layer.graphic.fillCircle(rx + p.dx * c.scale, c.y + p.dy * c.scale, p.r * c.scale);
         }
       }
     }
