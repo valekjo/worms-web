@@ -163,22 +163,34 @@ export class GameScene extends Phaser.Scene {
     const imageData = ctx.createImageData(width, height);
     const data = imageData.data;
 
-    const groundR = (CONFIG.TERRAIN.GROUND_COLOR >> 16) & 0xff;
-    const groundG = (CONFIG.TERRAIN.GROUND_COLOR >> 8) & 0xff;
-    const groundB = CONFIG.TERRAIN.GROUND_COLOR & 0xff;
+    const groundR  = (CONFIG.TERRAIN.GROUND_COLOR  >> 16) & 0xff;
+    const groundG  = (CONFIG.TERRAIN.GROUND_COLOR  >>  8) & 0xff;
+    const groundB  =  CONFIG.TERRAIN.GROUND_COLOR        & 0xff;
+    const contourR = (CONFIG.TERRAIN.CONTOUR_COLOR >> 16) & 0xff;
+    const contourG = (CONFIG.TERRAIN.CONTOUR_COLOR >>  8) & 0xff;
+    const contourB =  CONFIG.TERRAIN.CONTOUR_COLOR        & 0xff;
+    const shadowR  = (CONFIG.TERRAIN.SHADOW_COLOR  >> 16) & 0xff;
+    const shadowG  = (CONFIG.TERRAIN.SHADOW_COLOR  >>  8) & 0xff;
+    const shadowB  =  CONFIG.TERRAIN.SHADOW_COLOR        & 0xff;
 
-    for (let i = 0; i < bitmap.length; i++) {
-      const idx = i * 4;
-      if (bitmap[i] === 1) {
-        data[idx] = groundR;
-        data[idx + 1] = groundG;
-        data[idx + 2] = groundB;
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const i = y * width + x;
+        const idx = i * 4;
+        if (bitmap[i] !== 1) {
+          data[idx + 3] = 0;
+          continue;
+        }
+        const aboveAir = y === 0 || bitmap[(y - 1) * width + x] !== 1;
+        const twoAboveAir = y <= 1 || bitmap[(y - 2) * width + x] !== 1;
+        if (aboveAir) {
+          data[idx] = contourR; data[idx + 1] = contourG; data[idx + 2] = contourB;
+        } else if (twoAboveAir) {
+          data[idx] = shadowR;  data[idx + 1] = shadowG;  data[idx + 2] = shadowB;
+        } else {
+          data[idx] = groundR;  data[idx + 1] = groundG;  data[idx + 2] = groundB;
+        }
         data[idx + 3] = 255;
-      } else {
-        data[idx] = 0;
-        data[idx + 1] = 0;
-        data[idx + 2] = 0;
-        data[idx + 3] = 0;
       }
     }
 

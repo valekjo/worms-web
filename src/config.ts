@@ -8,6 +8,8 @@ export const CONFIG = {
   WIND_MAX: 80,           // max wind force px/s²
   TERRAIN: {
     GROUND_COLOR: 0x4a7c4e,
+    CONTOUR_COLOR: 0x7ec850,   // bright grass edge
+    SHADOW_COLOR: 0x2e5c32,    // dark sub-surface shadow
     SKY_COLOR: 0x87ceeb,
     MIN_HEIGHT: 200,      // min terrain height from top
     MAX_HEIGHT: 500,
