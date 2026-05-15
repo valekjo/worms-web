@@ -12,6 +12,7 @@ import { create as createRifle } from '../game/weapons/Rifle';
 import { create as createGrenade } from '../game/weapons/Grenade';
 import { HUD } from '../ui/HUD';
 import { WeaponSelector } from '../ui/WeaponSelector';
+import { registerWormTexture, createWormAnimations, BODY_ORIGIN_Y } from '../game/WormSprites';
 
 interface GameData {
   mode: 'hotseat' | 'vsai';
@@ -19,9 +20,9 @@ interface GameData {
 }
 
 interface WormVisual {
-  graphic: Phaser.GameObjects.Graphics;
+  sprite: Phaser.GameObjects.Sprite;
   worm: Worm;
-  teamColor: number;
+  texKey: string;
 }
 
 export class GameScene extends Phaser.Scene {
@@ -34,6 +35,7 @@ export class GameScene extends Phaser.Scene {
   // Rendering
   private renderTexture!: Phaser.GameObjects.RenderTexture;
   private wormVisuals: WormVisual[] = [];
+  private activeRingGraphic!: Phaser.GameObjects.Graphics;
 
   // Clouds (three parallax layers)
   private cloudLayers!: Array<{
@@ -144,13 +146,22 @@ export class GameScene extends Phaser.Scene {
     // Camera: follow active worm across the world
     this.cameras.main.setBounds(0, 0, CONFIG.WORLD_WIDTH, CONFIG.HEIGHT);
 
-    // Create worm visuals
+    // Generate per-team sprite sheets and create worm sprites
     for (const team of this.teams) {
+      const texKey = `worm_team_${team.index}`;
+      registerWormTexture(this, texKey, team.color);
+      createWormAnimations(this, texKey);
       for (const worm of team.worms) {
-        const graphic = this.add.graphics().setDepth(5);
-        this.wormVisuals.push({ graphic, worm, teamColor: team.color });
+        const sprite = this.add.sprite(worm.x, worm.y, texKey, 0)
+          .setDepth(5)
+          .setOrigin(0.5, BODY_ORIGIN_Y);
+        sprite.play(`${texKey}_idle`);
+        this.wormVisuals.push({ sprite, worm, texKey });
       }
     }
+
+    // Active-worm selection ring
+    this.activeRingGraphic = this.add.graphics().setDepth(6);
 
     // Aim graphic
     this.aimGraphic = this.add.graphics().setDepth(6);
@@ -208,17 +219,15 @@ export class GameScene extends Phaser.Scene {
       for (let x = 0; x < width; x++) {
         const i = y * width + x;
         const idx = i * 4;
-        if (bitmap[i] !== 1) {
-          data[idx + 3] = 0;
-          continue;
-        }
-        const aboveAir  = y === 0 || bitmap[(y - 1) * width + x] !== 1;
-        const above2Air = y <= 1 || bitmap[(y - 2) * width + x] !== 1;
-        const above3Air = y <= 2 || bitmap[(y - 3) * width + x] !== 1;
-        const above4Air = y <= 3 || bitmap[(y - 4) * width + x] !== 1;
-        if (aboveAir || above2Air || above3Air) {
+        if (bitmap[i] !== 1) { data[idx + 3] = 0; continue; }
+
+        // Count solid pixels directly above (0 = surface pixel)
+        let depth = 0;
+        while (depth < 10 && y - depth - 1 >= 0 && bitmap[(y - depth - 1) * width + x] === 1) depth++;
+
+        if (depth < 6) {
           data[idx] = contourR; data[idx + 1] = contourG; data[idx + 2] = contourB;
-        } else if (above4Air) {
+        } else if (depth < 8) {
           data[idx] = shadowR;  data[idx + 1] = shadowG;  data[idx + 2] = shadowB;
         } else {
           data[idx] = groundR;  data[idx + 1] = groundG;  data[idx + 2] = groundB;
@@ -525,6 +534,9 @@ export class GameScene extends Phaser.Scene {
     this.renderTexture.erase(eraseGfx, 0, 0);
     eraseGfx.destroy();
 
+    // Redraw contour pixels around the new crater edge
+    this.redrawTerrainPatch(cx, cy, config.blastRadius);
+
     this.doPoofEffect(cx, cy, config.blastRadius);
 
     // Apply damage to worms
@@ -546,6 +558,57 @@ export class GameScene extends Phaser.Scene {
         }
       }
     }
+  }
+
+  private redrawTerrainPatch(cx: number, cy: number, radius: number): void {
+    const CONTOUR_DEPTH = 8; // must match drawTerrainToTexture scan limit
+    const margin = CONTOUR_DEPTH + 2;
+    const { width, height } = this.terrain;
+    const bitmap = this.terrain.getBitmap();
+
+    const x0 = Math.max(0, Math.floor(cx - radius - margin));
+    const y0 = Math.max(0, Math.floor(cy - radius - margin));
+    const x1 = Math.min(width  - 1, Math.ceil(cx + radius + margin));
+    const y1 = Math.min(height - 1, Math.ceil(cy + radius + margin));
+    const pw = x1 - x0 + 1;
+    const ph = y1 - y0 + 1;
+
+    const canvas = document.createElement('canvas');
+    canvas.width  = pw;
+    canvas.height = ph;
+    const ctx = canvas.getContext('2d')!;
+    const imgData = ctx.createImageData(pw, ph);
+    const data = imgData.data;
+
+    const cR = (CONFIG.TERRAIN.CONTOUR_COLOR >> 16) & 0xff, cG = (CONFIG.TERRAIN.CONTOUR_COLOR >> 8) & 0xff, cB = CONFIG.TERRAIN.CONTOUR_COLOR & 0xff;
+    const sR = (CONFIG.TERRAIN.SHADOW_COLOR  >> 16) & 0xff, sG = (CONFIG.TERRAIN.SHADOW_COLOR  >> 8) & 0xff, sB = CONFIG.TERRAIN.SHADOW_COLOR  & 0xff;
+    const gR = (CONFIG.TERRAIN.GROUND_COLOR  >> 16) & 0xff, gG = (CONFIG.TERRAIN.GROUND_COLOR  >> 8) & 0xff, gB = CONFIG.TERRAIN.GROUND_COLOR  & 0xff;
+
+    for (let py = y0; py <= y1; py++) {
+      for (let px = x0; px <= x1; px++) {
+        const bi  = py * width + px;
+        const idx = ((py - y0) * pw + (px - x0)) * 4;
+        if (bitmap[bi] !== 1) { data[idx + 3] = 0; continue; }
+
+        let depth = 0;
+        while (depth < 10 && py - depth - 1 >= 0 && bitmap[(py - depth - 1) * width + px] === 1) depth++;
+
+        let r, g, b;
+        if (depth < 6)      { r = cR; g = cG; b = cB; }
+        else if (depth < 8) { r = sR; g = sG; b = sB; }
+        else                { r = gR; g = gG; b = gB; }
+        data[idx] = r; data[idx + 1] = g; data[idx + 2] = b; data[idx + 3] = 255;
+      }
+    }
+
+    ctx.putImageData(imgData, 0, 0);
+    const patchKey = '__terrain_patch__';
+    if (this.textures.exists(patchKey)) this.textures.remove(patchKey);
+    this.textures.addCanvas(patchKey, canvas);
+    const img = this.add.image(x0, y0, patchKey).setOrigin(0, 0);
+    this.renderTexture.draw(img, x0, y0);
+    img.destroy();
+    this.textures.remove(patchKey);
   }
 
   private doPoofEffect(cx: number, cy: number, radius: number): void {
@@ -719,27 +782,23 @@ export class GameScene extends Phaser.Scene {
   }
 
   private drawWorms(): void {
-    for (const { graphic, worm, teamColor } of this.wormVisuals) {
-      graphic.clear();
-      if (!worm.alive) continue;
+    this.activeRingGraphic.clear();
 
-      const isActive = this.turnManager.activeWorm === worm;
+    for (const { sprite, worm, texKey } of this.wormVisuals) {
+      if (!worm.alive) { sprite.setVisible(false); continue; }
+      sprite.setVisible(true);
+      sprite.setPosition(worm.x, worm.y);
+      sprite.setFlipX(worm.facingLeft);
 
-      // Body
-      graphic.fillStyle(teamColor, 1);
-      graphic.fillCircle(worm.x, worm.y, 10);
+      // Switch animation based on horizontal movement
+      const walking = Math.abs(worm.velX) > 5;
+      const wanted  = walking ? `${texKey}_walk` : `${texKey}_idle`;
+      if (sprite.anims.currentAnim?.key !== wanted) sprite.play(wanted);
 
-      // Eyes
-      graphic.fillStyle(0xffffff, 1);
-      const eyeOffX = worm.facingLeft ? -4 : 4;
-      graphic.fillCircle(worm.x + eyeOffX, worm.y - 2, 3);
-      graphic.fillStyle(0x000000, 1);
-      graphic.fillCircle(worm.x + eyeOffX, worm.y - 2, 1.5);
-
-      // Active indicator (ring)
-      if (isActive) {
-        graphic.lineStyle(2, 0xffffff, 1);
-        graphic.strokeCircle(worm.x, worm.y, 13);
+      // Active worm: glowing ring
+      if (this.turnManager.activeWorm === worm) {
+        this.activeRingGraphic.lineStyle(2, 0xffffff, 0.9);
+        this.activeRingGraphic.strokeCircle(worm.x, worm.y, 14);
       }
     }
   }
