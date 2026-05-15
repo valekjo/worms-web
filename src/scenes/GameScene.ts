@@ -598,11 +598,12 @@ export class GameScene extends Phaser.Scene {
     const windFactors = [0.15, 0.35, 0.65];
     for (let li = 0; li < this.cloudLayers.length; li++) {
       const layer = this.cloudLayers[li];
+      const windDir = Math.sign(this.wind) || 1;
       const windDrift = this.wind * windFactors[li];
       layer.graphic.clear();
       layer.graphic.fillStyle(layer.color, layer.alpha);
       for (const c of layer.clouds) {
-        c.x += (c.speed + windDrift) * dt;
+        c.x += (c.speed * windDir + windDrift) * dt;
         if (c.x > CONFIG.WIDTH + 250) c.x = -250;
         if (c.x < -250) c.x = CONFIG.WIDTH + 250;
         for (const p of c.puffs) {
