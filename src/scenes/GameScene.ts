@@ -342,12 +342,12 @@ export class GameScene extends Phaser.Scene {
       this.hud.updateWeapon('GRENADE');
     }
 
-    // UP always lifts the barrel, DOWN always lowers it, regardless of facing direction
+    // UP always lifts the barrel, DOWN always lowers it, clamped to straight up/down
     const AIM_SPEED = 2.0; // radians per second
     if (this.cursors.up?.isDown) {
-      this.aimElevation -= AIM_SPEED * dt;
+      this.aimElevation = Math.max(-Math.PI / 2, this.aimElevation - AIM_SPEED * dt);
     } else if (this.cursors.down?.isDown) {
-      this.aimElevation += AIM_SPEED * dt;
+      this.aimElevation = Math.min(Math.PI / 2, this.aimElevation + AIM_SPEED * dt);
     }
 
     // SPACE: hold to charge, release to fire
