@@ -18,7 +18,7 @@ export const CONFIG = {
   ],
   WEAPONS: {
     BAZOOKA: { damage: 50, blastRadius: 60, speed: 400, gravity: 200 },
-    RIFLE:   { damage: 25, blastRadius: 20, speed: 900, gravity: 50  },
+    RIFLE:   { damage: 25, blastRadius: 20, speed: 900, gravity: 0   },
     GRENADE: { damage: 60, blastRadius: 80, speed: 350, gravity: 300, fuseTime: 3000 },
   },
 };

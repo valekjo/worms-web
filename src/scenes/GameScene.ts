@@ -40,7 +40,7 @@ export class GameScene extends Phaser.Scene {
   private projectileGraphics: Map<Projectile, Phaser.GameObjects.Graphics> = new Map();
 
   // Aiming
-  private aimAngle: number = 0;
+  private aimElevation: number = 0; // angle relative to facing dir, negative = up
   private aimPower: number = 0;
   private isCharging: boolean = false;
   private chargeStartTime: number = 0;
@@ -76,6 +76,7 @@ export class GameScene extends Phaser.Scene {
     this.wind = (Math.random() * 2 - 1) * CONFIG.WIND_MAX;
     this.selectedWeapon = 'BAZOOKA';
     this.isCharging = false;
+    this.aimElevation = 0;
     this.aimPower = 0;
     this.aiDelayTimer = 0;
     this.aiPendingFire = null;
@@ -143,11 +144,6 @@ export class GameScene extends Phaser.Scene {
       space: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE),
       enter: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.ENTER),
     };
-
-    // Mouse input
-    this.input.on('pointerdown', this.onPointerDown, this);
-    this.input.on('pointermove', this.onPointerMove, this);
-    this.input.on('pointerup', this.onPointerUp, this);
 
     // Update wind display
     this.hud.updateWind(this.wind);
@@ -247,7 +243,7 @@ export class GameScene extends Phaser.Scene {
         const elapsed = (time - this.chargeStartTime) / 1000;
         power = Math.min(1, elapsed / 2);
       }
-      this.drawAimLine(activeWorm, power);
+      this.drawAimLine(activeWorm);
     }
 
     // Update projectiles
@@ -346,12 +342,12 @@ export class GameScene extends Phaser.Scene {
       this.hud.updateWeapon('GRENADE');
     }
 
-    // Angle control: UP rotates aim upward, DOWN rotates downward
+    // UP always lifts the barrel, DOWN always lowers it, regardless of facing direction
     const AIM_SPEED = 2.0; // radians per second
     if (this.cursors.up?.isDown) {
-      this.aimAngle -= AIM_SPEED * dt;
+      this.aimElevation -= AIM_SPEED * dt;
     } else if (this.cursors.down?.isDown) {
-      this.aimAngle += AIM_SPEED * dt;
+      this.aimElevation += AIM_SPEED * dt;
     }
 
     // SPACE: hold to charge, release to fire
@@ -362,73 +358,41 @@ export class GameScene extends Phaser.Scene {
       const elapsed = (this.time.now - this.chargeStartTime) / 1000;
       this.aimPower = Math.min(1, elapsed / 2);
       this.isCharging = false;
-      this.fireWeapon(this.turnManager.activeWorm, this.aimAngle, this.aimPower);
+      const worm = this.turnManager.activeWorm;
+      const angle = worm.facingLeft ? Math.PI - this.aimElevation : this.aimElevation;
+      this.fireWeapon(worm, angle, this.aimPower);
     }
   }
 
-  private onPointerDown(pointer: Phaser.Input.Pointer): void {
-    const phase = this.turnManager.phase;
-    const activeTeam = this.turnManager.activeTeam;
-    if (phase !== 'AIMING' || activeTeam.isAI) return;
-
-    this.isCharging = true;
-    this.chargeStartTime = this.time.now;
-    this.updateAimFromPointer(pointer);
-  }
-
-  private onPointerMove(pointer: Phaser.Input.Pointer): void {
-    if (this.isCharging) {
-      this.updateAimFromPointer(pointer);
-    } else if (this.turnManager.phase === 'AIMING' && !this.turnManager.activeTeam.isAI) {
-      this.updateAimFromPointer(pointer);
-    }
-  }
-
-  private onPointerUp(pointer: Phaser.Input.Pointer): void {
-    const phase = this.turnManager.phase;
-    const activeTeam = this.turnManager.activeTeam;
-    if (!this.isCharging || phase !== 'AIMING' || activeTeam.isAI) return;
-
-    const elapsed = (this.time.now - this.chargeStartTime) / 1000;
-    this.aimPower = Math.min(1, elapsed / 2);
-    this.isCharging = false;
-
-    this.fireWeapon(this.turnManager.activeWorm, this.aimAngle, this.aimPower);
-  }
-
-  private updateAimFromPointer(pointer: Phaser.Input.Pointer): void {
-    const worm = this.turnManager.activeWorm;
-    const dx = pointer.x - worm.x;
-    const dy = pointer.y - worm.y;
-    this.aimAngle = Math.atan2(dy, dx);
-  }
-
-  private drawAimLine(worm: Worm, power: number): void {
+  private drawAimLine(worm: Worm): void {
+    const angle = worm.facingLeft ? Math.PI - this.aimElevation : this.aimElevation;
+    const cos = Math.cos(angle);
+    const sin = Math.sin(angle);
     const BAR_LEN = 80;
-    const cos = Math.cos(this.aimAngle);
-    const sin = Math.sin(this.aimAngle);
 
-    // Background track
-    this.aimGraphic.lineStyle(5, 0x555555, 0.7);
-    this.aimGraphic.beginPath();
-    this.aimGraphic.moveTo(worm.x, worm.y);
-    this.aimGraphic.lineTo(worm.x + cos * BAR_LEN, worm.y + sin * BAR_LEN);
-    this.aimGraphic.strokePath();
+    // Direction dots
+    for (let i = 0; i < 5; i++) {
+      const t = 16 + i * 12;
+      this.aimGraphic.fillStyle(0xffffff, 0.7 - i * 0.1);
+      this.aimGraphic.fillCircle(worm.x + cos * t, worm.y + sin * t, 2);
+    }
 
-    // Power fill along direction
-    if (power > 0) {
+    // Power bar (shown while charging)
+    if (this.isCharging) {
+      const elapsed = (this.time.now - this.chargeStartTime) / 1000;
+      const power = Math.min(1, elapsed / 2);
+
+      this.aimGraphic.lineStyle(5, 0x555555, 0.7);
+      this.aimGraphic.beginPath();
+      this.aimGraphic.moveTo(worm.x, worm.y);
+      this.aimGraphic.lineTo(worm.x + cos * BAR_LEN, worm.y + sin * BAR_LEN);
+      this.aimGraphic.strokePath();
+
       this.aimGraphic.lineStyle(5, 0xff4400, 1);
       this.aimGraphic.beginPath();
       this.aimGraphic.moveTo(worm.x, worm.y);
       this.aimGraphic.lineTo(worm.x + cos * BAR_LEN * power, worm.y + sin * BAR_LEN * power);
       this.aimGraphic.strokePath();
-    }
-
-    // Direction dots beyond the bar
-    for (let i = 0; i < 5; i++) {
-      const t = BAR_LEN + 12 + i * 12;
-      this.aimGraphic.fillStyle(0xffffff, 0.7 - i * 0.12);
-      this.aimGraphic.fillCircle(worm.x + cos * t, worm.y + sin * t, 2);
     }
   }
 
