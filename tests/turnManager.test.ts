@@ -22,7 +22,7 @@ describe('TurnManager', () => {
 
   beforeEach(() => {
     teams = makeTeams(2, 2);
-    tm = new TurnManager(teams, 30, 5);
+    tm = new TurnManager(teams, 30, 5, 0);
   });
 
   it('starts in AIMING phase', () => {
@@ -47,11 +47,15 @@ describe('TurnManager', () => {
     expect(changed).toBe(false);
   });
 
-  it('tick transitions AIMING → next turn when timer expires', () => {
+  it('tick transitions AIMING → TRANSITION → AIMING when timer expires', () => {
     const changed = tm.tick(31);
     expect(changed).toBe(true);
-    // After time runs out in AIMING, turn ends: now team 1
+    // Team advances immediately at transition start
     expect(tm.activeTeamIndex).toBe(1);
+    expect(tm.phase).toBe('TRANSITION');
+    // One more tick to step through instant transition (transitionTime = 0)
+    const changed2 = tm.tick(1);
+    expect(changed2).toBe(true);
     expect(tm.phase).toBe('AIMING');
     expect(tm.timeLeft).toBe(30);
   });
@@ -75,13 +79,17 @@ describe('TurnManager', () => {
     expect(tm.timeLeft).toBe(5);
   });
 
-  it('tick transitions RETREAT → AIMING when timer expires', () => {
+  it('tick transitions RETREAT → TRANSITION → AIMING when timer expires', () => {
     tm.onFired();
     tm.onProjectilesSettled();
     const changed = tm.tick(6);
     expect(changed).toBe(true);
-    expect(tm.phase).toBe('AIMING');
+    expect(tm.phase).toBe('TRANSITION');
     expect(tm.activeTeamIndex).toBe(1);
+    // Step through instant transition
+    const changed2 = tm.tick(1);
+    expect(changed2).toBe(true);
+    expect(tm.phase).toBe('AIMING');
   });
 
   it('endTurn advances to next team', () => {
@@ -108,7 +116,7 @@ describe('TurnManager', () => {
 
   it('skips dead teams on advance', () => {
     const threeTeams = makeTeams(3, 1);
-    const tm3 = new TurnManager(threeTeams, 30, 5);
+    const tm3 = new TurnManager(threeTeams, 30, 5, 0);
     // Kill team 1
     threeTeams[1].worms[0].takeDamage(1000);
     tm3.endTurn(); // should skip team 1, go to team 2

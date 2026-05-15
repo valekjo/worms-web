@@ -5,6 +5,7 @@ export const CONFIG = {
   MOVE_SPEED: 120,        // px/s
   TURN_TIME: 30,          // seconds
   RETREAT_TIME: 5,        // seconds
+  TRANSITION_TIME: 3,     // seconds between turns
   WIND_MAX: 80,           // max wind force px/s²
   TERRAIN: {
     GROUND_COLOR: 0x4a7c4e,

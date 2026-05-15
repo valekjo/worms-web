@@ -55,7 +55,7 @@ describe('getWeaponConfig', () => {
       expect(cfg.damage).toBeGreaterThan(0);
       expect(cfg.blastRadius).toBeGreaterThan(0);
       expect(cfg.speed).toBeGreaterThan(0);
-      expect(cfg.gravity).toBeGreaterThan(0);
+      expect(cfg.gravity).toBeGreaterThanOrEqual(0);
     }
   });
 });

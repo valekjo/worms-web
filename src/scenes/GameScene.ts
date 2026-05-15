@@ -105,7 +105,7 @@ export class GameScene extends Phaser.Scene {
       }
     }
 
-    this.turnManager = new TurnManager(this.teams, CONFIG.TURN_TIME, CONFIG.RETREAT_TIME);
+    this.turnManager = new TurnManager(this.teams, CONFIG.TURN_TIME, CONFIG.RETREAT_TIME, CONFIG.TRANSITION_TIME);
   }
 
   create(): void {
@@ -181,11 +181,13 @@ export class GameScene extends Phaser.Scene {
           data[idx + 3] = 0;
           continue;
         }
-        const aboveAir = y === 0 || bitmap[(y - 1) * width + x] !== 1;
-        const twoAboveAir = y <= 1 || bitmap[(y - 2) * width + x] !== 1;
-        if (aboveAir) {
+        const aboveAir  = y === 0 || bitmap[(y - 1) * width + x] !== 1;
+        const above2Air = y <= 1 || bitmap[(y - 2) * width + x] !== 1;
+        const above3Air = y <= 2 || bitmap[(y - 3) * width + x] !== 1;
+        const above4Air = y <= 3 || bitmap[(y - 4) * width + x] !== 1;
+        if (aboveAir || above2Air || above3Air) {
           data[idx] = contourR; data[idx + 1] = contourG; data[idx + 2] = contourB;
-        } else if (twoAboveAir) {
+        } else if (above4Air) {
           data[idx] = shadowR;  data[idx + 1] = shadowG;  data[idx + 2] = shadowB;
         } else {
           data[idx] = groundR;  data[idx + 1] = groundG;  data[idx + 2] = groundB;
@@ -224,7 +226,7 @@ export class GameScene extends Phaser.Scene {
     const phaseChanged = this.turnManager.tick(dt);
 
     // Handle wind change on new turn
-    if (phaseChanged && this.turnManager.phase === 'AIMING') {
+    if (phaseChanged && this.turnManager.phase === 'TRANSITION') {
       this.wind = (Math.random() * 2 - 1) * CONFIG.WIND_MAX;
       this.hud.updateWind(this.wind);
     }

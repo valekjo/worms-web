@@ -113,9 +113,9 @@ export class HUD {
 
   /** Update the top bar. */
   updateTurnInfo(turnNumber: number, team: Team, phase: TurnPhase, timeLeft: number): void {
-    const phaseLabel = phase === 'RETREAT' ? ' [Retreat]' : phase === 'FIRED' ? ' [Fired]' : '';
+    const phaseLabel = phase === 'RETREAT' ? ' [Retreat]' : phase === 'FIRED' ? ' [Fired]' : phase === 'TRANSITION' ? ' [Get Ready!]' : '';
     this.turnText.setText(`Turn ${turnNumber + 1} — ${team.name}${phaseLabel}`);
-    this.turnText.setColor(phase === 'RETREAT' ? '#ff8800' : '#ffffff');
+    this.turnText.setColor(phase === 'RETREAT' ? '#ff8800' : phase === 'TRANSITION' ? '#aaffaa' : '#ffffff');
 
     const t = Math.ceil(timeLeft);
     this.timerText.setText(`${t}s`);

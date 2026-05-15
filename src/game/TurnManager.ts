@@ -1,7 +1,7 @@
 import { Team } from './Team';
 import { Worm } from './Worm';
 
-export type TurnPhase = 'AIMING' | 'FIRED' | 'RETREAT' | 'GAME_OVER';
+export type TurnPhase = 'AIMING' | 'FIRED' | 'RETREAT' | 'TRANSITION' | 'GAME_OVER';
 
 export class TurnManager {
   teams: Team[];
@@ -12,11 +12,13 @@ export class TurnManager {
 
   private readonly turnTime: number;
   private readonly retreatTime: number;
+  private readonly transitionTime: number;
 
-  constructor(teams: Team[], turnTime: number, retreatTime: number) {
+  constructor(teams: Team[], turnTime: number, retreatTime: number, transitionTime: number = 3) {
     this.teams = teams;
     this.turnTime = turnTime;
     this.retreatTime = retreatTime;
+    this.transitionTime = transitionTime;
     this.timeLeft = turnTime;
   }
 
@@ -38,12 +40,11 @@ export class TurnManager {
     this.timeLeft -= delta;
     if (this.timeLeft <= 0) {
       this.timeLeft = 0;
-      if (this.phase === 'AIMING') {
-        // Time ran out while aiming → end turn directly
-        this.endTurn();
+      if (this.phase === 'AIMING' || this.phase === 'RETREAT') {
+        this.beginTransition();
         return true;
-      } else if (this.phase === 'RETREAT') {
-        this.endTurn();
+      } else if (this.phase === 'TRANSITION') {
+        this.startTurn();
         return true;
       }
     }
@@ -71,17 +72,31 @@ export class TurnManager {
     }
   }
 
-  /** Called when retreat time ends or manually skipped. */
+  /** Immediately advance to the next turn, skipping the transition delay. */
   endTurn(): void {
+    const aliveTeams = this.teams.filter((t) => t.alive);
+    if (aliveTeams.length <= 1) { this.phase = 'GAME_OVER'; return; }
+    this.advanceTeam();
+    this.phase = 'AIMING';
+    this.timeLeft = this.turnTime;
+    this.turnNumber++;
+  }
+
+  private beginTransition(): void {
     const aliveTeams = this.teams.filter((t) => t.alive);
     if (aliveTeams.length <= 1) {
       this.phase = 'GAME_OVER';
       return;
     }
     this.advanceTeam();
+    this.phase = 'TRANSITION';
+    this.timeLeft = this.transitionTime;
+    this.turnNumber++;
+  }
+
+  private startTurn(): void {
     this.phase = 'AIMING';
     this.timeLeft = this.turnTime;
-    this.turnNumber++;
   }
 
   private advanceTeam(): void {
