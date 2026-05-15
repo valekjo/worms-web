@@ -109,7 +109,7 @@ export class GameScene extends Phaser.Scene {
 
   create(): void {
     // Build terrain render texture
-    this.renderTexture = this.add.renderTexture(0, 0, CONFIG.WIDTH, CONFIG.HEIGHT).setDepth(0);
+    this.renderTexture = this.add.renderTexture(0, 0, CONFIG.WIDTH, CONFIG.HEIGHT).setOrigin(0, 0).setDepth(0);
     this.drawTerrainToTexture();
 
     // Create worm visuals
