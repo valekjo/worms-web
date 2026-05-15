@@ -35,9 +35,13 @@ export class GameScene extends Phaser.Scene {
   private renderTexture!: Phaser.GameObjects.RenderTexture;
   private wormVisuals: WormVisual[] = [];
 
-  // Clouds
-  private cloudGraphic!: Phaser.GameObjects.Graphics;
-  private clouds: Array<{ x: number; y: number; scale: number; speed: number; puffs: Array<{ dx: number; dy: number; r: number }> }> = [];
+  // Clouds (three parallax layers)
+  private cloudLayers!: Array<{
+    graphic: Phaser.GameObjects.Graphics;
+    clouds: Array<{ x: number; y: number; scale: number; speed: number; puffs: Array<{ dx: number; dy: number; r: number }> }>;
+    color: number;
+    alpha: number;
+  }>;
 
   // Projectiles
   private activeProjectiles: Projectile[] = [];
@@ -113,13 +117,24 @@ export class GameScene extends Phaser.Scene {
   }
 
   create(): void {
-    // Sky background (behind everything)
-    const skyBg = this.add.graphics().setDepth(-2);
-    skyBg.fillStyle(CONFIG.TERRAIN.SKY_COLOR, 1);
-    skyBg.fillRect(0, 0, CONFIG.WIDTH, CONFIG.HEIGHT);
+    // Sky gradient (horizon lighter, top deeper blue)
+    const skyBg = this.add.graphics().setDepth(-4);
+    const steps = 12;
+    for (let i = 0; i < steps; i++) {
+      const t = i / steps;
+      const r = Math.round(0x50 + t * (0xb8 - 0x50));
+      const g = Math.round(0x90 + t * (0xe8 - 0x90));
+      const b = Math.round(0xd0 + t * (0xff - 0xd0));
+      skyBg.fillStyle((r << 16) | (g << 8) | b, 1);
+      skyBg.fillRect(0, Math.floor((i / steps) * CONFIG.HEIGHT), CONFIG.WIDTH, Math.ceil(CONFIG.HEIGHT / steps) + 1);
+    }
 
-    // Cloud layer
-    this.cloudGraphic = this.add.graphics().setDepth(-1);
+    // Three cloud layers: far (slow, small, grey) → near (fast, large, white)
+    this.cloudLayers = [
+      { graphic: this.add.graphics().setDepth(-3), clouds: [], color: 0xbbccdd, alpha: 0.45 }, // far
+      { graphic: this.add.graphics().setDepth(-2), clouds: [], color: 0xddeeff, alpha: 0.65 }, // mid
+      { graphic: this.add.graphics().setDepth(-1), clouds: [], color: 0xffffff, alpha: 0.88 }, // near
+    ];
     this.initClouds();
 
     // Build terrain render texture
@@ -548,35 +563,51 @@ export class GameScene extends Phaser.Scene {
 
   private initClouds(): void {
     const rng = (n: number) => { const x = Math.sin(n * 127.1) * 43758.5; return x - Math.floor(x); };
-    for (let i = 0; i < 7; i++) {
-      const puffs = [];
-      const puffCount = 3 + Math.floor(rng(i * 3) * 3); // 3–5 puffs
-      for (let p = 0; p < puffCount; p++) {
-        puffs.push({
-          dx: (rng(i * 7 + p) - 0.3) * 80,
-          dy: (rng(i * 11 + p) - 0.5) * 30,
-          r:  28 + rng(i * 13 + p) * 28,
+    // Layer config: [count, baseScale, speedMin, speedMax, yMin, yMax, puffSizeBase]
+    const layerCfg = [
+      { count: 5, baseScale: 0.35, speedMin:  5, speedMax: 12, yMin:  30, yMax: 160, puffBase: 18 }, // far
+      { count: 5, baseScale: 0.60, speedMin: 13, speedMax: 22, yMin:  60, yMax: 220, puffBase: 24 }, // mid
+      { count: 4, baseScale: 0.90, speedMin: 24, speedMax: 40, yMin:  80, yMax: 260, puffBase: 30 }, // near
+    ];
+
+    layerCfg.forEach((cfg, li) => {
+      for (let i = 0; i < cfg.count; i++) {
+        const seed = li * 100 + i;
+        const puffs = [];
+        const puffCount = 3 + Math.floor(rng(seed * 3) * 3);
+        for (let p = 0; p < puffCount; p++) {
+          puffs.push({
+            dx: (rng(seed * 7 + p) - 0.3) * 80,
+            dy: (rng(seed * 11 + p) - 0.5) * 30,
+            r:  cfg.puffBase + rng(seed * 13 + p) * cfg.puffBase,
+          });
+        }
+        this.cloudLayers[li].clouds.push({
+          x:     rng(seed * 5) * CONFIG.WIDTH,
+          y:     cfg.yMin + rng(seed * 9) * (cfg.yMax - cfg.yMin),
+          scale: cfg.baseScale + rng(seed * 17) * 0.2,
+          speed: cfg.speedMin + rng(seed * 19) * (cfg.speedMax - cfg.speedMin),
+          puffs,
         });
       }
-      this.clouds.push({
-        x:     rng(i * 5) * CONFIG.WIDTH,
-        y:     60 + rng(i * 9) * 180,
-        scale: 0.7 + rng(i * 17) * 0.6,
-        speed: 8 + rng(i * 19) * 18,
-        puffs,
-      });
-    }
+    });
   }
 
   private updateClouds(dt: number): void {
-    this.cloudGraphic.clear();
-    for (const c of this.clouds) {
-      c.x += c.speed * dt;
-      if (c.x > CONFIG.WIDTH + 200) c.x = -200;
-
-      this.cloudGraphic.fillStyle(0xffffff, 0.82);
-      for (const p of c.puffs) {
-        this.cloudGraphic.fillCircle(c.x + p.dx * c.scale, c.y + p.dy * c.scale, p.r * c.scale);
+    // Wind contributes to cloud drift; parallax factors per layer (far → near)
+    const windFactors = [0.15, 0.35, 0.65];
+    for (let li = 0; li < this.cloudLayers.length; li++) {
+      const layer = this.cloudLayers[li];
+      const windDrift = this.wind * windFactors[li];
+      layer.graphic.clear();
+      layer.graphic.fillStyle(layer.color, layer.alpha);
+      for (const c of layer.clouds) {
+        c.x += (c.speed + windDrift) * dt;
+        if (c.x > CONFIG.WIDTH + 250) c.x = -250;
+        if (c.x < -250) c.x = CONFIG.WIDTH + 250;
+        for (const p of c.puffs) {
+          layer.graphic.fillCircle(c.x + p.dx * c.scale, c.y + p.dy * c.scale, p.r * c.scale);
+        }
       }
     }
   }
