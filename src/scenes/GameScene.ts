@@ -141,6 +141,7 @@ export class GameScene extends Phaser.Scene {
       key2: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.TWO),
       key3: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.THREE),
       space: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE),
+      enter: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.ENTER),
     };
 
     // Mouse input
@@ -235,7 +236,7 @@ export class GameScene extends Phaser.Scene {
 
     if (canControl) {
       this.handleWormMovement(activeWorm, dt);
-      this.handleWeaponKeys();
+      this.handleWeaponKeys(dt);
     }
 
     // Update aim line (only when aiming)
@@ -307,21 +308,27 @@ export class GameScene extends Phaser.Scene {
   }
 
   private handleWormMovement(worm: Worm, dt: number): void {
-    if (!worm.onGround) return;
     if (this.isCharging) return;
 
-    if (this.cursors.left?.isDown) {
-      worm.velX = -CONFIG.MOVE_SPEED;
-      worm.facingLeft = true;
-    } else if (this.cursors.right?.isDown) {
-      worm.velX = CONFIG.MOVE_SPEED;
-      worm.facingLeft = false;
-    } else {
-      worm.velX = 0;
+    if (worm.onGround) {
+      if (this.cursors.left?.isDown) {
+        worm.velX = -CONFIG.MOVE_SPEED;
+        worm.facingLeft = true;
+      } else if (this.cursors.right?.isDown) {
+        worm.velX = CONFIG.MOVE_SPEED;
+        worm.facingLeft = false;
+      } else {
+        worm.velX = 0;
+      }
+
+      if (Phaser.Input.Keyboard.JustDown(this.keys.enter)) {
+        worm.velY = -320;
+        worm.onGround = false;
+      }
     }
   }
 
-  private handleWeaponKeys(): void {
+  private handleWeaponKeys(dt: number): void {
     const phase = this.turnManager.phase;
     if (phase !== 'AIMING') return;
 
@@ -337,6 +344,25 @@ export class GameScene extends Phaser.Scene {
       this.selectedWeapon = 'GRENADE';
       this.weaponSelector.select('GRENADE');
       this.hud.updateWeapon('GRENADE');
+    }
+
+    // Angle control: UP rotates aim upward, DOWN rotates downward
+    const AIM_SPEED = 2.0; // radians per second
+    if (this.cursors.up?.isDown) {
+      this.aimAngle -= AIM_SPEED * dt;
+    } else if (this.cursors.down?.isDown) {
+      this.aimAngle += AIM_SPEED * dt;
+    }
+
+    // SPACE: hold to charge, release to fire
+    if (Phaser.Input.Keyboard.JustDown(this.keys.space)) {
+      this.isCharging = true;
+      this.chargeStartTime = this.time.now;
+    } else if (this.isCharging && Phaser.Input.Keyboard.JustUp(this.keys.space)) {
+      const elapsed = (this.time.now - this.chargeStartTime) / 1000;
+      this.aimPower = Math.min(1, elapsed / 2);
+      this.isCharging = false;
+      this.fireWeapon(this.turnManager.activeWorm, this.aimAngle, this.aimPower);
     }
   }
 
