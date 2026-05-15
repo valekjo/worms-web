@@ -16,11 +16,6 @@ export class HUD {
   // Weapon info
   private weaponText!: Phaser.GameObjects.Text;
 
-  // Power bar
-  private powerBg!: Phaser.GameObjects.Rectangle;
-  private powerFill!: Phaser.GameObjects.Rectangle;
-  private powerLabel!: Phaser.GameObjects.Text;
-
   // Worm health bars: keyed by worm id
   private healthBars: Map<number, {
     bg: Phaser.GameObjects.Rectangle;
@@ -75,27 +70,6 @@ export class HUD {
       })
       .setDepth(20);
 
-    // Power bar (bottom center)
-    const pw = 200;
-    const ph = 16;
-    const px = width / 2 - pw / 2;
-    const py = this.scene.scale.height - 56;
-
-    this.powerBg = this.scene.add
-      .rectangle(px, py, pw, ph, 0x333333, 0.8)
-      .setOrigin(0, 0)
-      .setDepth(20);
-    this.powerFill = this.scene.add
-      .rectangle(px, py, 0, ph, 0xff4400)
-      .setOrigin(0, 0)
-      .setDepth(21);
-    this.powerLabel = this.scene.add
-      .text(px + pw / 2, py + ph / 2, '', { fontSize: '13px', color: '#fff' })
-      .setOrigin(0.5)
-      .setDepth(22);
-
-    // Hide power bar initially
-    this.setPowerVisible(false);
   }
 
   /** Register a worm and create its floating health bar. */
@@ -182,19 +156,6 @@ export class HUD {
       GRENADE: '💣 Grenade  [3]',
     };
     this.weaponText.setText(names[type]);
-  }
-
-  /** Show/hide and set power bar value (0-1). */
-  setPower(power: number): void {
-    this.setPowerVisible(true);
-    this.powerFill.setSize(200 * power, 16);
-    this.powerLabel.setText(`Power: ${Math.round(power * 100)}%`);
-  }
-
-  setPowerVisible(visible: boolean): void {
-    this.powerBg.setVisible(visible);
-    this.powerFill.setVisible(visible);
-    this.powerLabel.setVisible(visible);
   }
 
   /** Show game-over overlay. */

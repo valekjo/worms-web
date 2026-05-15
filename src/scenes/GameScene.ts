@@ -241,7 +241,12 @@ export class GameScene extends Phaser.Scene {
     // Update aim line (only when aiming)
     this.aimGraphic.clear();
     if (phase === 'AIMING' && !activeTeam.isAI) {
-      this.drawAimLine(activeWorm);
+      let power = 0;
+      if (this.isCharging) {
+        const elapsed = (time - this.chargeStartTime) / 1000;
+        power = Math.min(1, elapsed / 2);
+      }
+      this.drawAimLine(activeWorm, power);
     }
 
     // Update projectiles
@@ -263,14 +268,6 @@ export class GameScene extends Phaser.Scene {
       this.turnManager.timeLeft,
     );
     this.hud.updateHealthBars(this.teams);
-
-    if (this.isCharging) {
-      const elapsed = (time - this.chargeStartTime) / 1000;
-      const power = Math.min(1, elapsed / 2);
-      this.hud.setPower(power);
-    } else {
-      this.hud.setPowerVisible(false);
-    }
   }
 
   private updateWormPhysics(worm: Worm, dt: number): void {
@@ -369,7 +366,6 @@ export class GameScene extends Phaser.Scene {
     const elapsed = (this.time.now - this.chargeStartTime) / 1000;
     this.aimPower = Math.min(1, elapsed / 2);
     this.isCharging = false;
-    this.hud.setPowerVisible(false);
 
     this.fireWeapon(this.turnManager.activeWorm, this.aimAngle, this.aimPower);
   }
@@ -381,17 +377,32 @@ export class GameScene extends Phaser.Scene {
     this.aimAngle = Math.atan2(dy, dx);
   }
 
-  private drawAimLine(worm: Worm): void {
-    const len = 60;
-    const dotCount = 6;
-    this.aimGraphic.lineStyle(2, 0xffffff, 0.7);
+  private drawAimLine(worm: Worm, power: number): void {
+    const BAR_LEN = 80;
+    const cos = Math.cos(this.aimAngle);
+    const sin = Math.sin(this.aimAngle);
 
-    for (let i = 0; i < dotCount; i++) {
-      const t = (i / dotCount) * len;
-      const x = worm.x + Math.cos(this.aimAngle) * t;
-      const y = worm.y + Math.sin(this.aimAngle) * t;
-      this.aimGraphic.fillStyle(0xffffff, 0.8 - i * 0.1);
-      this.aimGraphic.fillCircle(x, y, 2);
+    // Background track
+    this.aimGraphic.lineStyle(5, 0x555555, 0.7);
+    this.aimGraphic.beginPath();
+    this.aimGraphic.moveTo(worm.x, worm.y);
+    this.aimGraphic.lineTo(worm.x + cos * BAR_LEN, worm.y + sin * BAR_LEN);
+    this.aimGraphic.strokePath();
+
+    // Power fill along direction
+    if (power > 0) {
+      this.aimGraphic.lineStyle(5, 0xff4400, 1);
+      this.aimGraphic.beginPath();
+      this.aimGraphic.moveTo(worm.x, worm.y);
+      this.aimGraphic.lineTo(worm.x + cos * BAR_LEN * power, worm.y + sin * BAR_LEN * power);
+      this.aimGraphic.strokePath();
+    }
+
+    // Direction dots beyond the bar
+    for (let i = 0; i < 5; i++) {
+      const t = BAR_LEN + 12 + i * 12;
+      this.aimGraphic.fillStyle(0xffffff, 0.7 - i * 0.12);
+      this.aimGraphic.fillCircle(worm.x + cos * t, worm.y + sin * t, 2);
     }
   }
 
