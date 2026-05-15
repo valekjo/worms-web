@@ -109,7 +109,7 @@ export class GameScene extends Phaser.Scene {
 
   create(): void {
     // Build terrain render texture
-    this.renderTexture = this.add.renderTexture(0, 0, CONFIG.WIDTH, CONFIG.HEIGHT).setDepth(0);
+    this.renderTexture = this.add.renderTexture(0, 0, CONFIG.WIDTH, CONFIG.HEIGHT).setOrigin(0, 0).setDepth(0);
     this.drawTerrainToTexture();
 
     // Create worm visuals
@@ -284,17 +284,18 @@ export class GameScene extends Phaser.Scene {
     // Clamp x to map bounds
     worm.x = Math.max(8, Math.min(CONFIG.WIDTH - 8, worm.x));
 
-    // Terrain collision — push up to surface
+    // Terrain collision — check bottom of worm circle
+    const WORM_RADIUS = 10;
     const wx = Math.round(worm.x);
-    const wy = Math.round(worm.y);
+    const footY = Math.round(worm.y + WORM_RADIUS);
 
-    if (this.terrain.isSolid(wx, wy)) {
+    if (this.terrain.isSolid(wx, footY)) {
       // Scan upward to find surface
-      let surfY = wy;
+      let surfY = footY;
       while (surfY > 0 && this.terrain.isSolid(wx, surfY)) {
         surfY--;
       }
-      worm.y = surfY;
+      worm.y = surfY - WORM_RADIUS;
       worm.velY = 0;
       worm.onGround = true;
     } else {
