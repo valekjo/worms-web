@@ -325,19 +325,35 @@ export class GameScene extends Phaser.Scene {
   }
 
   private updateWormPhysics(worm: Worm, dt: number): void {
+    const WORM_RADIUS = 10;
+    const MAX_STEP    = 7;  // max pixels the worm can step up per frame (limits climbable slope)
+
     // Apply gravity
     worm.velY += CONFIG.GRAVITY * dt;
+
+    // Record foot position before moving (needed for step-height check)
+    const prevFootY = Math.round(worm.y + WORM_RADIUS);
 
     // Move
     worm.x += worm.velX * dt;
     worm.y += worm.velY * dt;
 
-    // Clamp x to map bounds
-    worm.x = Math.max(8, Math.min(CONFIG.WIDTH - 8, worm.x));
+    // Clamp x to world bounds
+    worm.x = Math.max(8, Math.min(CONFIG.WORLD_WIDTH - 8, worm.x));
+
+    // Slope / step-height limit: if the terrain surface at the new x is more than
+    // MAX_STEP pixels above the previous foot position, the slope is too steep —
+    // revert horizontal movement so the worm hits a wall rather than teleporting up.
+    if (worm.onGround && worm.velX !== 0) {
+      const surfY = this.terrain.surfaceY(Math.round(worm.x));
+      if (surfY < prevFootY - MAX_STEP) {
+        worm.x -= worm.velX * dt;
+        worm.velX = 0;
+      }
+    }
 
     // Terrain collision — check bottom of worm circle
-    const WORM_RADIUS = 10;
-    const wx = Math.round(worm.x);
+    const wx    = Math.round(worm.x);
     const footY = Math.round(worm.y + WORM_RADIUS);
 
     if (this.terrain.isSolid(wx, footY)) {
