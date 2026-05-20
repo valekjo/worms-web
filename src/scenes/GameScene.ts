@@ -10,6 +10,9 @@ import { WeaponType, getWeaponConfig } from '../game/weapons/Weapon';
 import { create as createBazooka } from '../game/weapons/Bazooka';
 import { create as createRifle } from '../game/weapons/Rifle';
 import { create as createGrenade } from '../game/weapons/Grenade';
+import { create as createHolyGrenade } from '../game/weapons/HolyGrenade';
+import { create as createBananaBomb } from '../game/weapons/BananaBomb';
+import { BOMBLET_CONFIG } from '../game/weapons/Weapon';
 import { HUD } from '../ui/HUD';
 import { WeaponSelector } from '../ui/WeaponSelector';
 import { registerWormTexture, createWormAnimations, BODY_ORIGIN_Y } from '../game/WormSprites';
@@ -183,6 +186,8 @@ export class GameScene extends Phaser.Scene {
       key1: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.ONE),
       key2: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.TWO),
       key3: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.THREE),
+      key4: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.FOUR),
+      key5: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.FIVE),
       space: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE),
       enter: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.ENTER),
     };
@@ -413,6 +418,14 @@ export class GameScene extends Phaser.Scene {
       this.selectedWeapon = 'GRENADE';
       this.weaponSelector.select('GRENADE');
       this.hud.updateWeapon('GRENADE');
+    } else if (Phaser.Input.Keyboard.JustDown(this.keys.key4)) {
+      this.selectedWeapon = 'HOLY_GRENADE';
+      this.weaponSelector.select('HOLY_GRENADE');
+      this.hud.updateWeapon('HOLY_GRENADE');
+    } else if (Phaser.Input.Keyboard.JustDown(this.keys.key5)) {
+      this.selectedWeapon = 'BANANA_BOMB';
+      this.weaponSelector.select('BANANA_BOMB');
+      this.hud.updateWeapon('BANANA_BOMB');
     }
 
     // UP always lifts the barrel, DOWN always lowers it, clamped to straight up/down
@@ -489,6 +502,12 @@ export class GameScene extends Phaser.Scene {
       case 'GRENADE':
         projectile = createGrenade(worm.x, worm.y - 8, angle, power, this.wind);
         break;
+      case 'HOLY_GRENADE':
+        projectile = createHolyGrenade(worm.x, worm.y - 8, angle, power, this.wind);
+        break;
+      case 'BANANA_BOMB':
+        projectile = createBananaBomb(worm.x, worm.y - 8, angle, power, this.wind);
+        break;
     }
 
     this.activeProjectiles.push(projectile);
@@ -508,18 +527,40 @@ export class GameScene extends Phaser.Scene {
       if (explode || (!proj.state.alive)) {
         if (explode && proj.state.exploded) {
           this.doExplosion(proj.state.x, proj.state.y, proj.config);
+          if (proj.config.splitCount && proj.config.splitCount > 0) {
+            this.spawnBomblets(proj.state.x, proj.state.y, proj.config.splitCount);
+          }
         }
         gfx?.destroy();
         this.projectileGraphics.delete(proj);
         toRemove.push(proj);
       } else if (gfx) {
         gfx.clear();
-        gfx.fillStyle(0xffff00, 1);
-        gfx.fillCircle(proj.state.x, proj.state.y, 4);
-        // Grenade draws bigger dot
-        if (proj.config.fuseTime !== undefined) {
+        const name = proj.config.name;
+        if (name === 'Holy Grenade') {
+          // Bright white core with green halo
+          gfx.fillStyle(0x44ff44, 0.4);
+          gfx.fillCircle(proj.state.x, proj.state.y, 9);
+          gfx.fillStyle(0xffffff, 1);
+          gfx.fillCircle(proj.state.x, proj.state.y, 5);
+        } else if (name === 'Banana Bomb') {
+          // Yellow larger circle
+          gfx.fillStyle(0xffdd00, 1);
+          gfx.fillCircle(proj.state.x, proj.state.y, 7);
+          gfx.fillStyle(0xff8800, 0.7);
+          gfx.fillCircle(proj.state.x, proj.state.y, 4);
+        } else if (name === 'Bomblet') {
+          // Small orange bomblet
+          gfx.fillStyle(0xff6600, 1);
+          gfx.fillCircle(proj.state.x, proj.state.y, 4);
+        } else if (proj.config.fuseTime !== undefined) {
+          // Regular grenade
           gfx.fillStyle(0xff8800, 1);
           gfx.fillCircle(proj.state.x, proj.state.y, 5);
+        } else {
+          // Bazooka / rifle
+          gfx.fillStyle(0xffff00, 1);
+          gfx.fillCircle(proj.state.x, proj.state.y, 4);
         }
       }
     }
@@ -714,6 +755,18 @@ export class GameScene extends Phaser.Scene {
         },
         onComplete: () => smoke.destroy(),
       });
+    }
+  }
+
+  private spawnBomblets(cx: number, cy: number, count: number): void {
+    for (let i = 0; i < count; i++) {
+      // Spread in a fan upward and to the sides
+      const spread = (Math.PI * 1.4);
+      const angle = -Math.PI / 2 - spread / 2 + (i / (count - 1)) * spread + (Math.random() - 0.5) * 0.3;
+      const power = 0.45 + Math.random() * 0.35;
+      const proj = new Projectile(cx, cy - 4, angle, BOMBLET_CONFIG, this.wind, power);
+      this.activeProjectiles.push(proj);
+      this.projectileGraphics.set(proj, this.add.graphics().setDepth(8));
     }
   }
 

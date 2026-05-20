@@ -27,7 +27,7 @@ describe('getWeaponConfig', () => {
     expect(cfg.name).toBe('Bazooka');
     expect(cfg.damage).toBe(50);
     expect(cfg.blastRadius).toBe(60);
-    expect(cfg.speed).toBe(400);
+    expect(cfg.speed).toBe(620);
     expect(cfg.windFactor).toBe(1.0);
     expect(cfg.fuseTime).toBeUndefined();
   });

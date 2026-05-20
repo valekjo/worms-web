@@ -1,11 +1,13 @@
 import Phaser from 'phaser';
 import { WeaponType } from '../game/weapons/Weapon';
 
-const WEAPONS: WeaponType[] = ['BAZOOKA', 'RIFLE', 'GRENADE'];
+const WEAPONS: WeaponType[] = ['BAZOOKA', 'RIFLE', 'GRENADE', 'HOLY_GRENADE', 'BANANA_BOMB'];
 const LABELS: Record<WeaponType, string> = {
-  BAZOOKA: '1:Bazooka',
-  RIFLE:   '2:Rifle',
-  GRENADE: '3:Grenade',
+  BAZOOKA:      '1:Bazooka',
+  RIFLE:        '2:Rifle',
+  GRENADE:      '3:Grenade',
+  HOLY_GRENADE: '4:Holy Gren.',
+  BANANA_BOMB:  '5:Banana',
 };
 
 export class WeaponSelector {
@@ -21,14 +23,17 @@ export class WeaponSelector {
 
   private create(): void {
     const { width, height } = this.scene.scale;
-    const startX = width / 2 - 160;
+    const slotW = 120;
+    const gap = 6;
+    const totalW = WEAPONS.length * slotW + (WEAPONS.length - 1) * gap;
+    const startX = width / 2 - totalW / 2 + slotW / 2;
     const y = height - 30;
 
     for (let i = 0; i < WEAPONS.length; i++) {
-      const wx = startX + i * 160;
-      const rect = this.scene.add.rectangle(wx, y, 140, 44, 0x222222, 0.85).setDepth(10).setScrollFactor(0);
+      const wx = startX + i * (slotW + gap);
+      const rect = this.scene.add.rectangle(wx, y, slotW, 44, 0x222222, 0.85).setDepth(10).setScrollFactor(0);
       const txt = this.scene.add
-        .text(wx, y, LABELS[WEAPONS[i]], { fontSize: '16px', color: '#fff' })
+        .text(wx, y, LABELS[WEAPONS[i]], { fontSize: '14px', color: '#fff' })
         .setOrigin(0.5)
         .setDepth(11).setScrollFactor(0);
       this.containers.push(rect);

@@ -151,9 +151,11 @@ export class HUD {
   /** Update weapon label. */
   updateWeapon(type: WeaponType): void {
     const names: Record<WeaponType, string> = {
-      BAZOOKA: '🚀 Bazooka  [1]',
-      RIFLE: '🔫 Rifle    [2]',
-      GRENADE: '💣 Grenade  [3]',
+      BAZOOKA:      '🚀 Bazooka      [1]',
+      RIFLE:        '🔫 Rifle        [2]',
+      GRENADE:      '💣 Grenade      [3]',
+      HOLY_GRENADE: '✝️ Holy Grenade [4]',
+      BANANA_BOMB:  '🍌 Banana Bomb  [5]',
     };
     this.weaponText.setText(names[type]);
   }

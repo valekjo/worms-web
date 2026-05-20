@@ -21,8 +21,11 @@ export const CONFIG = {
     { name: 'Team Blue', color: 0x4444ff },
   ],
   WEAPONS: {
-    BAZOOKA: { damage: 50, blastRadius: 60, speed: 400, gravity: 200 },
-    RIFLE:   { damage: 25, blastRadius: 20, speed: 900, gravity: 0   },
-    GRENADE: { damage: 60, blastRadius: 80, speed: 350, gravity: 300, fuseTime: 3000 },
+    BAZOOKA:      { damage: 50,  blastRadius: 60,  speed: 620, gravity: 200 },
+    RIFLE:        { damage: 25,  blastRadius: 20,  speed: 900, gravity: 0   },
+    GRENADE:      { damage: 60,  blastRadius: 80,  speed: 580, gravity: 300, fuseTime: 3000 },
+    HOLY_GRENADE: { damage: 150, blastRadius: 110, speed: 540, gravity: 300, fuseTime: 1500 },
+    BANANA_BOMB:  { damage: 30,  blastRadius: 55,  speed: 540, gravity: 300, fuseTime: 4000, splitCount: 5 },
+    BOMBLET:      { damage: 50,  blastRadius: 55,  speed: 170, gravity: 420, fuseTime: 2500 },
   },
 };
